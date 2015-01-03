@@ -11,16 +11,16 @@
 
 ; ----------------------------------------------------------------------------------------------------------------------
 ; Function .....: AccessRights_RunAsAdmin
-; Description ..: Runs an AutoHotkey script as administrator.
-; Author .......: shajul, reformatted by Cyruz - http://ciroprincipe.info
+; Description ..: Run the current AutoHotkey script as administrator.
+; Author .......: shajul
 ; ----------------------------------------------------------------------------------------------------------------------
 AccessRights_RunAsAdmin() {
     Global
-    Loop, %0%  ; For each parameter
-        sParams .= A_Space . %A_Index%
-    Local ShellExecute
-    ShellExecute := (A_IsUnicode) ? "Shell32.dll\ShellExecute" : "Shell32.dll\ShellExecuteA"
     If ( !A_IsAdmin ) {
+        Loop, %0%  ; For each parameter
+            sParams .= A_Space . %A_Index%
+        Local ShellExecute
+        ShellExecute := (A_IsUnicode) ? "Shell32.dll\ShellExecute" : "Shell32.dll\ShellExecuteA"
         A_IsCompiled
         ? DllCall( ShellExecute, UInt,0, Str,"RunAs", Str,A_ScriptFullPath, Str,sParams , Str,A_WorkingDir, Int,1 )
         : DllCall( ShellExecute, UInt,0, Str,"RunAs", Str,A_AhkPath, Str,"""" A_ScriptFullPath """ " sParams
@@ -31,7 +31,7 @@ AccessRights_RunAsAdmin() {
 
 ; ----------------------------------------------------------------------------------------------------------------------
 ; Function .....: AccessRights_RunAsUser
-; Description ..: Runs a program as limited user, stripping all eventuals administrator rights.
+; Description ..: Run a program as limited user, stripping all eventual administrator rights.
 ; Parameters ...: sCmdLine - Commandline to be executed.
 ; ----------------------------------------------------------------------------------------------------------------------
 AccessRights_RunAsUser(sCmdLine)
@@ -45,19 +45,20 @@ AccessRights_RunAsUser(sCmdLine)
     ; TOKEN_QUERY          = 0x0008 ; TOKEN_ADJUST_DEFAULT = 0x0080
     DllCall( "Advapi32.dll\OpenProcessToken", Ptr,hProc, UInt,0x0001|0x0002|0x0008|0x0080, PtrP,hToken )
 
-    If A_OSVersion in WIN_2000,WIN_XP ; The flag LUA_TOKEN doesn't work on XP, we need to deny the Administrators SID.
+    ; The flag LUA_TOKEN doesn't work on XP, we need to deny the Administrators SID.
+    If A_OSVersion in WIN_2000,WIN_XP
     {   ; Create an Administrators SID and fill SID structure.
         bOldSys = 1
 
         ; * [IMPORTANT]
         ; * The Well-Known Administrators SID needs 2 subauthorities: 
         ; * SECURITY_BUILTIN_DOMAIN_RID and DOMAIN_ALIAS_RID_ADMINS.
-        ; * http://msdn.microsoft.com/en-us/library/windows/desktop/aa379597.aspx.
+        ; * http://msdn.microsoft.com/en-us/library/windows/desktop/aa379597.aspx
         szSid := DllCall( "Advapi32.dll\GetSidLengthRequired", UChar,2 )
         VarSetCapacity(pSid, szSid, 0)
 
         ; Well-Known SID Structures - http://msdn.microsoft.com/en-us/library/cc980032.aspx
-        ; WELL_KNOWN_SID_TYPE { ... WinBuiltinAdministratorsSid = 26 ...}.
+        ; WELL_KNOWN_SID_TYPE { ... WinBuiltinAdministratorsSid = 26 ... }
         DllCall( "Advapi32.dll\CreateWellKnownSid", UInt,26, Ptr,0, Ptr,&pSid, UIntP,szSid )
 
         ; SID_AND_ATTRIBUTES - http://msdn.microsoft.com/en-us/library/aa379595
@@ -72,11 +73,12 @@ AccessRights_RunAsUser(sCmdLine)
                                                  , Ptr,(bOldSys)?&SIDATTR:0, UInt,0, Ptr,0, UInt,0, Ptr,0
                                                  , PtrP,hResToken )
 
-    if A_OSVersion in WIN_VISTA,WIN_7,WIN_8 ; We can set integrity levels only on Windows Vista/7/8.
+    ; We can set integrity levels only on Windows Vista/7/8.
+    If A_OSVersion in WIN_VISTA,WIN_7,WIN_8
     {   ; Create an integrity SID and set the integrity level.
-
+    
         ; * [IMPORTANT]
-        ; * The Well-Known Integrity SIDs need 1 subauthority: 
+        ; * The Well-Known Integrity SIDs need 1 subauthority.
         ; * In our case, we need SECURITY_MANDATORY_LOW_RID or SECURITY_MANDATORY_MEDIUM_RID.
         ; * http://msdn.microsoft.com/en-us/library/bb625963.aspx
         szSid := DllCall( "Advapi32.dll\GetSidLengthRequired", UChar,1 )
@@ -84,7 +86,7 @@ AccessRights_RunAsUser(sCmdLine)
 
         ; Well-Known SID Structures - http://msdn.microsoft.com/en-us/library/cc980032.aspx
         ; WELL_KNOWN_SID_TYPE { ... WinLowLabelSid = 66, WinMediumLabelSid = 67 ...}
-        DllCall( "Advapi32.dll\CreateWellKnownSid", UInt,67, UInt,0, Ptr,&pSid, UIntP,szSid )
+        DllCall( "Advapi32.dll\CreateWellKnownSid", UInt,66, UInt,0, Ptr,&pSid, UIntP,szSid )
 
         ; SE_GROUP_INTEGRITY = 0x00000020L
         VarSetCapacity(      SIDATTR,  (A_PtrSize == 4) ? 8 : 16, 0      )
