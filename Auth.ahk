@@ -1,5 +1,5 @@
 ; ----------------------------------------------------------------------------------------------------------------------
-; Name .........: AccessRights library
+; Name .........: Auth library
 ; Description ..: This library is a collection of functions that deal with privileges and access rights.
 ; AHK Version ..: AHK_L 1.1.13.01 x32/64 Unicode
 ; Author .......: Cyruz  (http://ciroprincipe.info)
@@ -7,14 +7,16 @@
 ; Changelog ....: Oct. 25, 2011 - v0.1 - First version.
 ; ..............: Dic. 27, 2013 - v0.2 - Added AccessRights_RunAsAdmin.
 ; ..............: Feb. 05, 2014 - v0.3 - Code refactoring. Unicode and x64 version. Added AccessRights_EnableSeDebug.
+; ..............: Jan. 17, 2015 - v0.4 - Changed library name to Auth. Generalized AccessRights_EnableSeDebug for all 
+; ..............:                        privileges and converted to Auth_AdjustPrivileges. Added Auth_AdjustPrivilege.
 ; ----------------------------------------------------------------------------------------------------------------------
 
 ; ----------------------------------------------------------------------------------------------------------------------
-; Function .....: AccessRights_RunAsAdmin
+; Function .....: Auth_RunAsAdmin
 ; Description ..: Run the current AutoHotkey script as administrator.
 ; Author .......: shajul
 ; ----------------------------------------------------------------------------------------------------------------------
-AccessRights_RunAsAdmin() {
+Auth_RunAsAdmin() {
     Global
     If ( !A_IsAdmin ) {
         Loop, %0%  ; For each parameter
@@ -30,11 +32,11 @@ AccessRights_RunAsAdmin() {
 }
 
 ; ----------------------------------------------------------------------------------------------------------------------
-; Function .....: AccessRights_RunAsUser
+; Function .....: Auth_RunAsUser
 ; Description ..: Run a program as limited user, stripping all eventual administrator rights.
 ; Parameters ...: sCmdLine - Commandline to be executed.
 ; ----------------------------------------------------------------------------------------------------------------------
-AccessRights_RunAsUser(sCmdLine)
+Auth_RunAsUser(sCmdLine)
 {
     hMod := DllCall( "LoadLibrary", Str,"Advapi32.dll" )
 
@@ -121,24 +123,96 @@ AccessRights_RunAsUser(sCmdLine)
 }
 
 ; ----------------------------------------------------------------------------------------------------------------------
-; Function .....: AccessRights_EnableSeDebug
-; Description ..: Enable the SE_DEBUG_PRIVILEGE on the current script instance.
+; Function .....: Auth_AdjustPrivileges
+; Description ..: Adjust process privileges.
+; Parameters ...: arrPriv - Array of objects describing the privileges to adjust. It has the following structure:
+; ..............:           arrPriv[n].privilege - Privilege name as a constant string: http://goo.gl/uHkV0S. 
+; ..............:           arrPriv[n].state     - 2 to enable, 4 to disable.
+; Example ......: Auth_AdjustPrivileges([ { "privilege" : "SeDebugPrivilege",          "state" : 2 }
+; ..............:                              ,  { "privilege" : "SeCreatePageFilePrivilege", "state" : 2 } ])
 ; ----------------------------------------------------------------------------------------------------------------------
-AccessRights_EnableSeDebug() {
-	hProc := DllCall( "OpenProcess", UInt,0x0400, Int,0, UInt,DllCall("GetCurrentProcessId"), "Ptr" )
-	DllCall( "Advapi32.dll\OpenProcessToken", Ptr,hProc, UInt,0x0020|0x0008, PtrP,hToken )
+Auth_AdjustPrivileges(ByRef arrPriv, nPid:=0, bDisableAll:=0) {
+    If ( !isObject(arrPriv) || !arrPriv.MaxIndex() )
+        Return 0
+    
+    Try {    
+        ; PROCESS_QUERY_INFORMATION = 0x400
+        If ( !hProc := DllCall( "OpenProcess", UInt,0x0400, Int,0, UInt,(nPid)?nPid:DllCall("GetCurrentProcessId") ) )
+            Throw Exception("Error", "OpenProcess", A_LastError)
+        ; TOKEN_ADJUST_PRIVILEGES = 0x0020, TOKEN_QUERY = 0x0008
+        If ( !DllCall( "Advapi32.dll\OpenProcessToken", Ptr,hProc, UInt,0x0020|0x0008, PtrP,hToken ) )
+            Throw Exception("Error", "OpenProcessToken", A_LastError)
+            
+        ; TOKEN_PRIVILEGES size = 16, LUID_AND_ATTRIBUTES size = 12
+        VarSetCapacity( TOKPRIV, 4+(arrPriv.MaxIndex()*12), 0 ) ; TOKEN_PRIVILEGES structure: http://goo.gl/AGXeAp.
+        Loop % arrPriv.MaxIndex()
+        {
+            nOfft := (A_Index - 1) * 12, VarSetCapacity( LUID, 8, 0 )
+            If ( !DllCall( "Advapi32.dll\LookupPrivilegeValue", Ptr,0, Str,arrPriv[A_Index].privilege, Ptr,&LUID ) )
+                Continue
+            NumPut( NumGet( &LUID, 0, "UInt" ), &TOKPRIV, nOfft+4,  "UInt" ) ; LUID_AND_ATTRIBUTES > LUID > LoPart.
+            NumPut( NumGet( &LUID, 4, "UInt" ), &TOKPRIV, nOfft+8,  "UInt" ) ; LUID_AND_ATTRIBUTES > LUID > HiPart.
+            NumPut( arrPriv[A_Index].state,     &TOKPRIV, nOfft+12, "UInt" ) ; LUID_AND_ATTRIBUTES > Attributes.
+            nDone++
+        }
+        
+        If ( !nDone )
+            Throw Exception("No privileges processed.")
+    
+        NumPut( nDone, &TOKPRIV, 0, "UInt" ) ; TOKEN_PRIVILEGES > PrivilegeCount.
+        If ( !DllCall( "Advapi32.dll\AdjustTokenPrivileges", Ptr,hToken, Int,bDisableAll, Ptr,&TOKPRIV, UInt,0, Ptr,0
+                                                           , Ptr,0 ) )
+            Throw Exception("Error", "AdjustTokenPrivileges", A_LastError)
+    }
+    Finally {
+        hToken ? DllCall( "CloseHandle", Ptr,hToken )
+        hProc  ? DllCall( "CloseHandle", Ptr,hProc  )
+    }
+    Return nDone
+}
 
-	VarSetCapacity(LUID, 8, 0)
-	DllCall( "Advapi32.dll\LookupPrivilegeValue", Ptr,0, Str,"SeDebugPrivilege", Ptr,&LUID )
-
-	VarSetCapacity( TOKPRIV, 16, 0   )					      ; TOKEN_PRIVILEGES structure: http://goo.gl/AGXeAp.
-	NumPut( 1, &TOKPRIV, 0,   "UInt" )                        ; TOKEN_PRIVILEGES > PrivilegeCount.
-	NumPut( NumGet( &LUID, 0, "UInt" ), &TOKPRIV, 4, "UInt" ) ; TOKEN_PRIVILEGES > LUID_AND_ATTRIBUTES > LUID > LoPart.
-	NumPut( NumGet( &LUID, 4, "UInt" ), &TOKPRIV, 8, "UInt" ) ; TOKEN_PRIVILEGES > LUID_AND_ATTRIBUTES > LUID > HiPart.
-	NumPut( 2, &TOKPRIV, 12,  "UInt" )                        ; TOKEN_PRIVILEGES > LUID_AND_ATTRIBUTES > Attributes.
-														      ; SE_PRIVILEGE_ENABLED = 2.
-
-	DllCall( "Advapi32.dll\AdjustTokenPrivileges", Ptr,hToken, Int,0, Ptr,&TOKPRIV, UInt,0, Ptr,0, Ptr,0 )
-    DllCall( "CloseHandle", Ptr,hToken )
-    DllCall( "CloseHandle", Ptr,hProc  )
+; ----------------------------------------------------------------------------------------------------------------------
+; Function .....: Auth_AdjustPrivilege
+; Description ..: Enable or disable a privilege on the current script instance.
+; Parameters ...: nPrivilege - Number identifying the privilege to enable/disable.
+; ..............: nEnable    - 1 for enabling, 0 for disabling.
+; Remarks ......: These are the privileges known values:
+; ..............: SeAssignPrimaryTokenPrivilege    - 3   - Replace a process token
+; ..............: SeAuditPrivilege                - 21   - Generate audit entries
+; ..............: SeBackupPrivilege               - 17   - Grant all file read access (ACL Bypass)
+; ..............: SeChangeNotifyPrivilege         - 23   - Receive file/folder change notifications
+; ..............: SeCreateGlobalPrivilege         - 30   - Create global objects
+; ..............: SeCreatePagefilePrivilege       - 15   - Create pagefile
+; ..............: SeCreatePermanentPrivilege      - 16   - Create permanent shared object
+; ..............: SeCreateSymbolicLinkPrivilege   - 33   - Create symbolic links
+; ..............: SeCreateTokenPrivilege          -  2   - Create a token
+; ..............: SeDebugPrivilege                - 20   - Open any process (ACL Bypass)
+; ..............: SeEnableDelegationPrivilege     - 27   - Trust users for delegation
+; ..............: SeImpersonatePrivilege          - 29   - Enable thread impersonation
+; ..............: SeIncreaseBasePriorityPrivilege - 14   - Increase process priority
+; ..............: SeIncreaseQuotaPrivilege        -  5   - Increase process memory quota
+; ..............: SeIncreaseWorkingSetPrivilege   - 30   - Increase process WS
+; ..............: SeLoadDriverPrivilege           - 10   - Load/Unload driver
+; ..............: SeLockMemoryPrivilege           -  4   - Lock pages in memory
+; ..............: SeMachineAccountPrivilege       -  6   - Create user account
+; ..............: SeManageVolumePrivilege         - 28   - Manage files on a volume
+; ..............: SeProfileSingleProcessPrivilege - 13   - Gather process profiling info
+; ..............: SeRelabelPrivilege              - 32   - Modify object label
+; ..............: SeRemoteShutdownPrivilege       - 24   - Shutdown a remote computer
+; ..............: SeRestorePrivilege              - 18   - Grant all file write access (ACL Bypass)
+; ..............: SeSecurityPrivilege             -  8   - Manage auditying and security log
+; ..............: SeShutdownPrivilege             - 19   - Initiate Shutdown
+; ..............: SeSyncAgentPrivilege            - 26   - Use directory sync services
+; ..............: SeSystemEnvironmentPrivilege    - 22   - Modify firmware environment values
+; ..............: SeSystemProfilePrivilege        - 11   - Gather system profiling info
+; ..............: SeSystemtimePrivilege           - 12   - Change time
+; ..............: SeTakeOwnershipPrivilege        -  9   - Change object owner (ACL Bypass)
+; ..............: SeTcbPrivilege                  -  7   - Idetify as a trusted, protected subsystem
+; ..............: SeTimeZonePrivilege             - 34   - Change time zone
+; ..............: SeTrustedCredManAccessPrivilege - 31   - Access the Credential Manager (trusted caller)
+; ..............: SeUndockPrivilege               - 25   - Remove from docking station
+; ..............: SeUnsolicitedInputPrivilege     - 35 ? - Read unsolicited input (from terminal device)
+; ----------------------------------------------------------------------------------------------------------------------
+Auth_AdjustPrivilege(nPrivilege, nEnable:=1) {
+    DllCall( "ntdll.dll\RtlAdjustPrivilege", UInt,nPrivilege, Int,nEnable, Int,0, Int,0 )
 }
