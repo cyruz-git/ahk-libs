@@ -125,44 +125,48 @@ Auth_RunAsUser(sCmdLine)
 ; ----------------------------------------------------------------------------------------------------------------------
 ; Function .....: Auth_AdjustPrivileges
 ; Description ..: Adjust process privileges.
-; Parameters ...: arrPriv - Array of objects describing the privileges to adjust. It has the following structure:
-; ..............:           arrPriv[n].privilege - Privilege name as a constant string: http://goo.gl/uHkV0S. 
-; ..............:           arrPriv[n].state     - 2 to enable, 4 to disable.
+; Parameters ...: arrPriv     - Array of objects describing the privileges to adjust. If = 0 all privileges will be
+; ..............:               disabled. It has the following structure:
+; ..............:               arrPriv[n].privilege - Privilege name as a constant string: http://goo.gl/uHkV0S. 
+; ..............:               arrPriv[n].state     - 0 to disable, 2 to enable, 4 to remove from the list.
+; ..............: nPid        - PID of the process to be adjusted, if = 0 the current process will be adjusted.
+; Return .......: Number of processed privileges or 0 if all the privileges are disabled.
 ; Example ......: Auth_AdjustPrivileges([ { "privilege" : "SeDebugPrivilege",          "state" : 2 }
-; ..............:                              ,  { "privilege" : "SeCreatePageFilePrivilege", "state" : 2 } ])
+; ..............:                      ,  { "privilege" : "SeCreatePageFilePrivilege", "state" : 2 } ])
 ; ----------------------------------------------------------------------------------------------------------------------
-Auth_AdjustPrivileges(ByRef arrPriv, nPid:=0, bDisableAll:=0) {
-    If ( !isObject(arrPriv) || !arrPriv.MaxIndex() )
-        Return 0
+Auth_AdjustPrivileges(ByRef arrPriv, nPid:=0) {
+    If ( (!isObject(arrPriv) && arrPriv != 0) || (isObject(arrPriv) && !arrPriv.MaxIndex()) )
+        Throw Exception("Parameters error.", "Auth_AdjustPrivileges")
     
     Try {    
         ; PROCESS_QUERY_INFORMATION = 0x400
         If ( !hProc := DllCall( "OpenProcess", UInt,0x0400, Int,0, UInt,(nPid)?nPid:DllCall("GetCurrentProcessId") ) )
-            Throw Exception("Error", "OpenProcess", A_LastError)
+            Throw Exception("Error: " A_LastError, "OpenProcess")
         ; TOKEN_ADJUST_PRIVILEGES = 0x0020, TOKEN_QUERY = 0x0008
         If ( !DllCall( "Advapi32.dll\OpenProcessToken", Ptr,hProc, UInt,0x0020|0x0008, PtrP,hToken ) )
-            Throw Exception("Error", "OpenProcessToken", A_LastError)
-            
-        ; TOKEN_PRIVILEGES size = 16, LUID_AND_ATTRIBUTES size = 12
-        VarSetCapacity( TOKPRIV, 4+(arrPriv.MaxIndex()*12), 0 ) ; TOKEN_PRIVILEGES structure: http://goo.gl/AGXeAp.
-        Loop % arrPriv.MaxIndex()
-        {
-            nOfft := (A_Index - 1) * 12, VarSetCapacity( LUID, 8, 0 )
-            If ( !DllCall( "Advapi32.dll\LookupPrivilegeValue", Ptr,0, Str,arrPriv[A_Index].privilege, Ptr,&LUID ) )
-                Continue
-            NumPut( NumGet( &LUID, 0, "UInt" ), &TOKPRIV, nOfft+4,  "UInt" ) ; LUID_AND_ATTRIBUTES > LUID > LoPart.
-            NumPut( NumGet( &LUID, 4, "UInt" ), &TOKPRIV, nOfft+8,  "UInt" ) ; LUID_AND_ATTRIBUTES > LUID > HiPart.
-            NumPut( arrPriv[A_Index].state,     &TOKPRIV, nOfft+12, "UInt" ) ; LUID_AND_ATTRIBUTES > Attributes.
-            nDone++
+            Throw Exception("Error: " A_LastError, "OpenProcessToken")
+        
+        If ( isObject(arrPriv) ) {
+            ; TOKEN_PRIVILEGES size = 16, LUID_AND_ATTRIBUTES size = 12
+            VarSetCapacity( TOKPRIV, 4+(arrPriv.MaxIndex()*12), 0 ) ; TOKEN_PRIVILEGES structure: http://goo.gl/AGXeAp.
+            Loop % arrPriv.MaxIndex()
+            {
+                nOfft := (A_Index - 1) * 12, VarSetCapacity( LUID, 8, 0 )
+                If ( !DllCall( "Advapi32.dll\LookupPrivilegeValue", Ptr,0, Str,arrPriv[A_Index].privilege, Ptr,&LUID ) )
+                    Continue
+                NumPut( NumGet( &LUID, 0, "UInt" ), &TOKPRIV, nOfft+4,  "UInt" ) ; LUID_AND_ATTRIBUTES > LUID > LoPart.
+                NumPut( NumGet( &LUID, 4, "UInt" ), &TOKPRIV, nOfft+8,  "UInt" ) ; LUID_AND_ATTRIBUTES > LUID > HiPart.
+                NumPut( arrPriv[A_Index].state,     &TOKPRIV, nOfft+12, "UInt" ) ; LUID_AND_ATTRIBUTES > Attributes.
+                nDone++
+            }
+            If ( !nDone )
+                Throw Exception("No privileges processed.")
+            NumPut( nDone, &TOKPRIV, 0, "UInt" ) ; TOKEN_PRIVILEGES > PrivilegeCount.
         }
         
-        If ( !nDone )
-            Throw Exception("No privileges processed.")
-    
-        NumPut( nDone, &TOKPRIV, 0, "UInt" ) ; TOKEN_PRIVILEGES > PrivilegeCount.
-        If ( !DllCall( "Advapi32.dll\AdjustTokenPrivileges", Ptr,hToken, Int,bDisableAll, Ptr,&TOKPRIV, UInt,0, Ptr,0
-                                                           , Ptr,0 ) )
-            Throw Exception("Error", "AdjustTokenPrivileges", A_LastError)
+        If ( !DllCall( "Advapi32.dll\AdjustTokenPrivileges", Ptr,hToken, Int,(arrPriv==0)?1:0
+                                                           , Ptr,(arrPriv==0)?0:&TOKPRIV, UInt,0, Ptr,0, Ptr,0 ) )
+            Throw Exception("Error: " A_LastError, "AdjustTokenPrivileges")
     }
     Finally {
         hToken ? DllCall( "CloseHandle", Ptr,hToken )
