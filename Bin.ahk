@@ -3,8 +3,7 @@
 ; Description ..: This library is a collection of functions that deal with binary data.
 ; AHK Version ..: AHK_L 1.1.13.01 x32/64 ANSI/Unicode
 ; License ......: WTFPL - http://www.wtfpl.net/txt/copying/
-; Changelog ....: Jan. 21, 2015 - v0.1   - First version.
-; ..............: Jan. 22, 2015 - v0.1.1 - Bin_GetBitmap gets a pointer as first parameter, not a variable.
+; Changelog ....: Jan. 21, 2015 - v0.1 - First version.
 ; ----------------------------------------------------------------------------------------------------------------------
 
 ; ----------------------------------------------------------------------------------------------------------------------
@@ -85,16 +84,17 @@ Bin_CryptFromString(ByRef cBuf, ByRef sStr, nFlags:=0x4)
 ; ----------------------------------------------------------------------------------------------------------------------
 ; Function .....: Bin_GetBitmap
 ; Description ..: Run the current AutoHotkey script as administrator.
-; Parameters ...: adrBuf - Pointer to the binary data buffer containing the bitmap.
-; ..............: szBuf  - Size of the buffer.
+; Parameters ...: cBuf  - Binary data buffer containing the bitmap.
+; ..............: szBuf - Size of the buffer.
 ; Return .......: Handle to a bitmap.
 ; Code from ....: SKAN - http://goo.gl/iknYZB
 ; ----------------------------------------------------------------------------------------------------------------------
-Bin_GetBitmap(adrBuf, szBuf)
+Bin_GetBitmap(cBuf, szBuf:=0)
 {
+    (!szBuf) ? szBuf := VarSetCapacity(cBuf)
     hGlob := DllCall( "GlobalAlloc", UInt,2, UInt,szBuf, Ptr ) ; 2 = GMEM_MOVEABLE
     pGlob := DllCall( "GlobalLock", Ptr,hGlob, Ptr )
-    DllCall( "RtlMoveMemory", Ptr,pGlob, Ptr,adrBuf, UInt,szBuf )
+    DllCall( "RtlMoveMemory", Ptr,pGlob, Ptr,&cBuf, UInt,szBuf )
     DllCall( "GlobalUnlock", Ptr,hGlob )
     DllCall( "ole32.dll\CreateStreamOnHGlobal", Ptr,hGlob, Int,1, PtrP,pStream )
 
@@ -108,7 +108,6 @@ Bin_GetBitmap(adrBuf, szBuf)
     DllCall( "Gdiplus.dll\GdiplusShutdown", Ptr,gdipToken )
     DllCall( "FreeLibrary", Ptr,hGdip )
     ObjRelease(pStream)
-    
     Return hBitmap
 }
 
