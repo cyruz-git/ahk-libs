@@ -3,7 +3,8 @@
 ; Description ..: This library is a collection of functions that deal with binary data.
 ; AHK Version ..: AHK_L 1.1.13.01 x32/64 ANSI/Unicode
 ; License ......: WTFPL - http://www.wtfpl.net/txt/copying/
-; Changelog ....: Jan. 21, 2015 - v0.1 - First version.
+; Changelog ....: Jan. 21, 2015 - v0.1   - First version.
+; ..............: Jan. 22, 2015 - v0.1.1 - Moved Bin_GetBitmap in a separated library (BinGet).
 ; ----------------------------------------------------------------------------------------------------------------------
 
 ; ----------------------------------------------------------------------------------------------------------------------
@@ -80,34 +81,3 @@ Bin_CryptFromString(ByRef cBuf, ByRef sStr, nFlags:=0x4)
                                               , Ptr,&cBuf, UIntP,szBuf, Ptr,0, Ptr,0 )
     Return szBuf
 }
-
-; ----------------------------------------------------------------------------------------------------------------------
-; Function .....: Bin_GetBitmap
-; Description ..: Run the current AutoHotkey script as administrator.
-; Parameters ...: cBuf  - Binary data buffer containing the bitmap.
-; ..............: szBuf - Size of the buffer.
-; Return .......: Handle to a bitmap.
-; Code from ....: SKAN - http://goo.gl/iknYZB
-; ----------------------------------------------------------------------------------------------------------------------
-Bin_GetBitmap(cBuf, szBuf:=0)
-{
-    (!szBuf) ? szBuf := VarSetCapacity(cBuf)
-    hGlob := DllCall( "GlobalAlloc", UInt,2, UInt,szBuf, Ptr ) ; 2 = GMEM_MOVEABLE
-    pGlob := DllCall( "GlobalLock", Ptr,hGlob, Ptr )
-    DllCall( "RtlMoveMemory", Ptr,pGlob, Ptr,&cBuf, UInt,szBuf )
-    DllCall( "GlobalUnlock", Ptr,hGlob )
-    DllCall( "ole32.dll\CreateStreamOnHGlobal", Ptr,hGlob, Int,1, PtrP,pStream )
-
-    hGdip := DllCall( "LoadLibrary", Str,"Gdiplus.dll" )
-    VarSetCapacity(si, 16, 0), NumPut(1, si, "UChar")
-    DllCall( "Gdiplus.dll\GdiplusStartup", PtrP,gdipToken, Ptr,&si, Ptr,0 )
-    DllCall( "Gdiplus.dll\GdipCreateBitmapFromStream",  Ptr,pStream, PtrP,pBitmap )
-    DllCall( "Gdiplus.dll\GdipCreateHBITMAPFromBitmap", Ptr,pBitmap, PtrP,hBitmap, UInt,0 )
-
-    DllCall( "Gdiplus.dll\GdipDisposeImage", Ptr,pBitmap )
-    DllCall( "Gdiplus.dll\GdiplusShutdown", Ptr,gdipToken )
-    DllCall( "FreeLibrary", Ptr,hGdip )
-    ObjRelease(pStream)
-    Return hBitmap
-}
-
