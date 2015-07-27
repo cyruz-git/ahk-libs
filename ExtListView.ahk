@@ -17,13 +17,14 @@
 ; ----------------------------------------------------------------------------------------------------------------------
 ; Function .....: ExtListView_GetSingleItem
 ; Description ..: Get the first item with the desired state.
-; Parameters ...: objLV  - External ListView initializated object.
+; Parameters ...: objLV  - External ListView initialized object.
 ; ..............: sState - Status of the searched item. Common statuses are:
 ; ..............:          LVNI_ALL         - 0x0000
 ; ..............:          LVNI_FOCUSED     - 0x0001
 ; ..............:          LVNI_SELECTED    - 0x0002
 ; ..............:          LVNI_CUT         - 0x0004
 ; ..............:          LVNI_DROPHILITED - 0x0008
+; ..............: nCol   - Column of the desired item (0-based index).
 ; Info .........: For more info on the sState parameter have a look at the MSDN docs for the LVM_GETNEXTITEM message:
 ; ..............: http://msdn.microsoft.com/en-us/library/windows/desktop/bb761057%28v=vs.85%29.aspx
 ; Return .......: Single item as a string.
@@ -43,7 +44,7 @@ ExtListView_GetSingleItem(ByRef objLV, sState, nCol) {
 ; ----------------------------------------------------------------------------------------------------------------------
 ; Function .....: ExtListView_GetAllItems
 ; Description ..: Get all items that share the same status on the target ListView.
-; Parameters ...: objLV  - External ListView initializated object.
+; Parameters ...: objLV  - External ListView initialized object.
 ; ..............: sState - Status of the searched item. Common statuses are:
 ; ..............:          LVNI_ALL         - 0x0000
 ; ..............:          LVNI_FOCUSED     - 0x0001
@@ -76,7 +77,7 @@ ExtListView_GetAllItems(ByRef objLV, sState:=0x0000) {
 ; ----------------------------------------------------------------------------------------------------------------------
 ; Function .....: ExtListView_ToggleSelection
 ; Description ..: Select/deselect items in the target ListView.
-; Parameters ...: objLV   - External ListView initializated object.
+; Parameters ...: objLV   - External ListView initialized object.
 ; ..............: bSelect - 1 for selection, 0 for deselection.
 ; ..............: nItem   - -1 for all items or "n" (0-based) for a specific ListView item.
 ; ----------------------------------------------------------------------------------------------------------------------
@@ -96,7 +97,7 @@ ExtListView_ToggleSelection(ByRef objLV, bSelect:=1, nItem:=-1) {
 ; ----------------------------------------------------------------------------------------------------------------------
 ; Function .....: ExtListView_GetNextItem
 ; Description ..: Get the next item in the target ListView.
-; Parameters ...: objLV  - External ListView initializated object.
+; Parameters ...: objLV  - External ListView initialized object.
 ; ..............: nRow   - Row where to start the search for the next item (0-based index).
 ; ..............: lParam - Status of the searched item. Common statuses are:
 ; ..............:          LVNI_ALL         - 0x0000
@@ -116,7 +117,7 @@ ExtListView_GetNextItem(ByRef objLV, nRow, lParam:=0x0000) {
 ; ----------------------------------------------------------------------------------------------------------------------
 ; Function .....: ExtListView_GetItemText
 ; Description ..: Get the text of the desired item.
-; Parameters ...: objLV - External ListView initializated object.
+; Parameters ...: objLV - External ListView initialized object.
 ; ..............: nRow  - Row of the desired item (0-based index).
 ; ..............: nCol  - Column of the desired item (0-based index).
 ; Return .......: Item content as a string.
@@ -153,7 +154,7 @@ ExtListView_GetItemText(ByRef objLV, nRow, nCol) {
 ; ..............: szReadBuf - Size of the buffer used for reading the target process memory. It must be capable enough
 ; ..............:             to hold the longest cell in the ListView.
 ; ..............: sEnc      - Target ListView's encoding. "CP0" for ANSI, "UTF-8" or "UTF-16" for Unicode.
-; Return .......: objLV            - External ListView initializated object with the following keys:
+; Return .......: objLV            - External ListView initialized object with the following keys:
 ; ..............: objLV.swnd       - Title of the window owning the ListView.
 ; ..............: objLV.hwnd       - Handle to the window owning the ListView.
 ; ..............: objLV.hproc      - Handle to the process owning the ListView.
@@ -205,12 +206,12 @@ ExtListView_Initialize(sWnd, szReadBuf:=1024, sEnc:="CP0") {
 ; ----------------------------------------------------------------------------------------------------------------------
 ; Function .....: ExtListView_DeInitialize
 ; Description ..: DeInitialize the object.
-; Parameters ...: objLV - External ListView initializated object.
+; Parameters ...: objLV - External ListView initialized object.
 ; ----------------------------------------------------------------------------------------------------------------------
 ExtListView_DeInitialize(ByRef objLV) {
     ; Free the previously allocated memory on the target process.
     If ( !__ExtListView_DeAllocateMemory(objLV) )
-        Throw Exception("Error deallocating memory", "__ExtListView_Initialize", "LastError: " A_LastError)
+        Throw Exception("Error deallocating memory", "__ExtListView_DeInitialize", "LastError: " A_LastError)
     DllCall( "CloseHandle", Ptr,objLV.hproc )
     objLV := ""
 }
@@ -218,7 +219,7 @@ ExtListView_DeInitialize(ByRef objLV) {
 ; ----------------------------------------------------------------------------------------------------------------------
 ; Function .....: ExtListView_CheckInitObject
 ; Description ..: Check if the object is still referring to a valid ListView.
-; Parameters ...: objLV - External ListView initializated object.
+; Parameters ...: objLV - External ListView initialized object.
 ; Return .......: 0 if false, handle of the window containing the ListView if true.
 ; ----------------------------------------------------------------------------------------------------------------------
 ExtListView_CheckInitObject(ByRef objLV) {
@@ -228,7 +229,7 @@ ExtListView_CheckInitObject(ByRef objLV) {
 ; ----------------------------------------------------------------------------------------------------------------------
 ; Function .....: __ExtListView_AllocateMemory
 ; Description ..: Allocates memory into the target process.
-; Parameters ...: objLV - External ListView initializated object.
+; Parameters ...: objLV - External ListView initialized object.
 ; ----------------------------------------------------------------------------------------------------------------------
 __ExtListView_AllocateMemory(ByRef objLV) {
     ; MEM_COMMIT = 0x1000, PAGE_READWRITE = 0x4.
@@ -244,7 +245,7 @@ __ExtListView_AllocateMemory(ByRef objLV) {
 ; ----------------------------------------------------------------------------------------------------------------------
 ; Function .....: __ExtListView_DeAllocateMemory
 ; Description ..: Frees previously allocated memory.
-; Parameters ...: objLV - External ListView initializated object.
+; Parameters ...: objLV - External ListView initialized object.
 ; ----------------------------------------------------------------------------------------------------------------------
 __ExtListView_DeAllocateMemory(ByRef objLV) {
     ; MEM_RELEASE = 0x8000.
