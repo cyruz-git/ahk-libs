@@ -4,7 +4,7 @@
 ; AHK Version ..: AHK_L 1.1.13.01 x32/64 Unicode
 ; Author .......: Cyruz (http://ciroprincipe.info) - Thanks to Sean & Laszlo.
 ; License ......: WTFPL - http://www.wtfpl.net/txt/copying/
-; Changelog ....: Jan. 12, 2014 - v0.1 - First revision.
+; Changelog ....: Jan. 12, 2014 - v0.1 - First version.
 ; ----------------------------------------------------------------------------------------------------------------------
 
 ; ----------------------------------------------------------------------------------------------------------------------
@@ -71,10 +71,12 @@
 ; ..............: obj.ProcData[].UserHandles                - Number of USER handles that belong to the process.
 ; ..............: obj.ProcData[].PriorityClass              - Priority class for the process.
 ; ----------------------------------------------------------------------------------------------------------------------
-SysProcInfo_ToggleTimer(aParams*) {
+SysProcInfo_ToggleTimer(aParams*)
+{
     Static B_RUNNING, B_FIRSTRUN, N_MODE, H_WND, N_MESSAGE, N_TIME, A_PIDS, A_PROCS, OBJ_INFO, P_TIMER
     
-    If ( aParams[1] == "START" ) {     ; Called by the user.
+    If ( aParams[1] == "START" )
+    {   ; Called by the user.
         If ( B_RUNNING )
             Return -1
         If ( aParams[2]  < 1 || aParams[2] > 3          )
@@ -92,7 +94,8 @@ SysProcInfo_ToggleTimer(aParams*) {
         
         Return P_TIMER := DllCall( "SetTimer", Ptr,0, UInt,0, UInt,N_TIME, Ptr,RegisterCallback(A_ThisFunc) )
     }
-    Else If ( aParams[1] == "STOP" ) { ; Called by the user.
+    Else If ( aParams[1] == "STOP" )
+    {   ; Called by the user.
         If ( !B_RUNNING )
             Return -1
         If ( aParams.MaxIndex() > 1 )
@@ -106,18 +109,22 @@ SysProcInfo_ToggleTimer(aParams*) {
         
         Return DllCall( "KillTimer", Ptr,0, Ptr,P_TIMER )
     }
-    Else {                          ; Called by the timer.
+    Else
+    {   ; Called by the timer.
         If aParams[1] is not xdigit ; Return an error if the first parameter is not a hwnd.
             Return -3
         
         f := A_FormatInteger
         SetFormat, Float, 6.2
-        If ( N_MODE == 1 || N_MODE == 3 ) {
+        If ( N_MODE == 1 || N_MODE == 3 )
+        {
             OBJ_INFO.SystemData             := SysProcInfo_GetSystemMemoryStatus()
             OBJ_INFO.SystemData.SystemTimes := SysProcInfo_GetSystemTimes()
         }
-        If ( N_MODE == 2 || N_MODE == 3 ) {
-            (B_FIRSTRUN) ? OBJ_INFO.ProcData := Object()
+        If ( N_MODE == 2 || N_MODE == 3 )
+        {
+            If (B_FIRSTRUN)
+                OBJ_INFO.ProcData := Object()
             Loop % A_PROCS.MaxIndex()
             {
                 If ( B_FIRSTRUN )
@@ -147,7 +154,8 @@ SysProcInfo_ToggleTimer(aParams*) {
 ; Description ..: Returns the percentage of the total CPU Load. Call it repeateadly for consistent results.
 ; Thanks .......: Sean and Laszlo: http://www.autohotkey.com/community/viewtopic.php?t=18913
 ; ----------------------------------------------------------------------------------------------------------------------
-SysProcInfo_GetSystemTimes() {
+SysProcInfo_GetSystemTimes()
+{
     Static nOldIdleTime, nOldKernTime, nOldUserTime, nNewIdleTime, nNewKernTime, nNewUserTime
     nOldIdleTime := nNewIdleTime, nOldKernTime := nNewKernTime, nOldUserTime := nNewUserTime
     DllCall( "GetSystemTimes", Int64P,nNewIdleTime, Int64P,nNewKernTime, Int64P,nNewUserTime )
@@ -174,7 +182,8 @@ SysProcInfo_GetSystemTimes() {
 ; ..............: obj.ProcessCount      - The current number of processes.
 ; ..............: obj.ThreadCount       - The current number of threads.
 ; ----------------------------------------------------------------------------------------------------------------------
-SysProcInfo_GetSystemMemoryStatus() {
+SysProcInfo_GetSystemMemoryStatus()
+{
     nSz := VarSetCapacity(PERFORMANCEINFO, (A_PtrSize == 4) ? 56 : 104), NumPut(nSz, PERFORMANCEINFO, 0)
     DllCall( "psapi.dll\GetPerformanceInfo", Ptr,&PERFORMANCEINFO, UInt,nSz )
     nPhysUsed := NumGet(PERFORMANCEINFO, A_PtrSize*4, "UPtr") - NumGet(PERFORMANCEINFO, A_PtrSize*5, "UPtr")
@@ -204,7 +213,8 @@ SysProcInfo_GetSystemMemoryStatus() {
 ; ..............: nOldUserTime - Old user time. Seed 0 on start.
 ; Thanks .......: Sean and Laszlo: http://www.autohotkey.com/community/viewtopic.php?t=18913
 ; ----------------------------------------------------------------------------------------------------------------------
-SysProcInfo_GetProcessTimes(hProc, ByRef nOldKernTime, ByRef nOldUserTime) {
+SysProcInfo_GetProcessTimes(hProc, ByRef nOldKernTime, ByRef nOldUserTime)
+{
     DllCall( "GetProcessTimes", Ptr,hProc, Int64P,nCreationTime, Int64P,nExitTime, Int64P,nNewKernTime
                               , Int64P,nNewUserTime )
     nProcTime    := (nNewKernTime-nOldKernTime + nNewUserTime-nOldUserTime)*1.e-5
@@ -240,9 +250,10 @@ SysProcInfo_GetProcessTimes(hProc, ByRef nOldKernTime, ByRef nOldUserTime) {
 ; ..............: obj.UserHandles                - Number of USER handles that belong to the process.
 ; ..............: obj.PriorityClass              - Priority class for the process.
 ; ----------------------------------------------------------------------------------------------------------------------
-SysProcInfo_GetProcessMemoryInfo(hProc) {
+SysProcInfo_GetProcessMemoryInfo(hProc)
+{
     nSz := VarSetCapacity( PROCMEMCOUNTERS, (A_PtrSize == 4) ? 40 : 72, 0 ), NumPut( nSz, PROCMEMCOUNTERS, 0 )
-    VarSetCapacity(        IOCOUNTERS,      48,                         0 )
+    VarSetCapacity( IOCOUNTERS, 48, 0 )
     DllCall( "psapi.dll\GetProcessMemoryInfo",  Ptr,hProc, Ptr,&PROCMEMCOUNTERS, UInt,nSz )
     DllCall( "GetProcessIoCounters",            Ptr,hProc, Ptr,&IOCOUNTERS                )
     DllCall( "QueryProcessCycleTime",           Ptr,hProc, UInt64P,nCycleTime             )
@@ -288,7 +299,8 @@ Quit:
 SysProcInfo_ToggleTimer("STOP")
 ExitApp
 
-AHKNOTIFY(wParam, lParam) {
+AHKNOTIFY(wParam, lParam)
+{
     obj := Object(lParam)
     FileAppend, % "`n==="
                 . "`nSystem Times: "               obj.SystemData.SystemTimes
