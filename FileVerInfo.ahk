@@ -26,8 +26,9 @@ FileVerInfo(sFile, sVerStr:="") {
                      .  "03B6:Taiwan (Big5)|04B0:Unicode|04E2:Latin-2 (Eastern European)|04E3:Cyrillic|"
                      .  "04E4:Multilingual|04E5:Greek|04E6:Turkish|04E7:Hebrew|04E8:Arabic"
                         
-    (sVerStr == "") ? sVerStr := "Comments|CompanyName|FileDescription|FileVersion|InternalName|LegalCopyright"
-                    .  "|LegalTrademarks|OriginalFilename|ProductName|ProductVersion|PrivateBuild|SpecialBuild"
+    If ( sVerStr == "" )
+        sVerStr := "Comments|CompanyName|FileDescription|FileVersion|InternalName|LegalCopyright|LegalTrademarks|"
+                .  "OriginalFilename|ProductName|ProductVersion|PrivateBuild|SpecialBuild"
 
     If ( !szBuf := DllCall( "Version.dll\GetFileVersionInfoSize", Str,sFile, Ptr,0 ) )
         Return 0
