@@ -5,6 +5,8 @@
 ; ..............: box and return.
 ; Parameters ...: sFile - Path to the file to be created.
 ; Author .......: Cyruz - http://ciroprincipe.info
+; License ......: WTFPL - http://www.wtfpl.net/txt/copying/
+; Changelog ....: Jan. 12, 2015 - v0.1 - First Version.
 ; ----------------------------------------------------------------------------------------------------------------------
 PECreateEmpty(sFile) {
     Static sDummy := "" ; Dummy executable.
