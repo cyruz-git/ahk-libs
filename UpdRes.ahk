@@ -13,8 +13,9 @@
 ; ----------------------------------------------------------------------------------------------------------------------
 ; Function .....: UpdRes_LockResource
 ; Description ..: Load the specified resource and retrieve a pointer to its binary data.
-; Parameters ...: sBinFile - PE file whose resource is to be retrieved.
-; ..............: sResName - The name of the resource.
+; Parameters ...: sBinFile - PE file whose resource is to be retrieved. If = 0 the resource will be retrieved in the 
+; ..............:            current process.
+; ..............: sResName - The name of the resource or its integer identifier.
 ; ..............: nResType - The resource type.
 ; ..............: szData   - Byref parameter containing the size of the resource data.
 ; Return .......: A pointer to the first byte of the resource, 0 on error.
@@ -26,25 +27,30 @@ UpdRes_LockResource(sBinFile, sResName, nResType, ByRef szData)
     {
         ; If the DLL isn't already loaded, load it as a data file.
         If ( !hLib := DllCall( "LoadLibraryEx", Str,sBinFile, Ptr,0, UInt,0x2 ) )
-            Return 0, A_LastError := "LoadLibraryEx error.`nReturn value >>`t" hLib "`nLast error >>`t" A_LastError
+            Return 0, ErrorLevel := "LoadLibraryEx error`nReturn value = " hLib "`nLast error = " A_LastError
         bLoaded := 1
     }
     
-    If ( !hRes := DllCall( "FindResource", Ptr,hLib, Str,sResName, Ptr,nResType ) )
-        Return 0, A_LastError := "FindResource error.`nReturn value >>`t" hRes "`nLast error >>`t" A_LastError
-    
-    If ( !szData := DllCall( "SizeofResource", Ptr,hLib, Ptr,hRes ) )
-        Return 0, A_LastError := "SizeofResource error.`nReturn value >>`t" szData "`nLast error >>`t" A_LastError
-    
-    If ( !hData := DllCall( "LoadResource", Ptr,hLib, Ptr,hRes ) )
-        Return 0, A_LastError := "LoadResource error.`nReturn value >>`t" hData "`nLast error >>`t" A_LastError
-    
-    If ( !pData := DllCall( "LockResource", Ptr,hData ) )
-        Return 0, A_LastError := "LockResource error.`nReturn value >>`t" pData " - Last error >>`t" A_LastError
-    
-    ; If we loaded the DLL, free it now.
-    If ( bLoaded )
-        DllCall( "FreeLibrary", Ptr,hLib )
+    Try
+    {
+        If ( !hRes := DllCall( "FindResource", Ptr,hLib, Ptr,(sResName+0==sResName?sResname:&sResName), Ptr,nResType ) )
+            Return 0, ErrorLevel := "FindResource error`nReturn value = " hRes "`nLast error = " A_LastError
+        
+        If ( !szData := DllCall( "SizeofResource", Ptr,hLib, Ptr,hRes ) )
+            Return 0, ErrorLevel := "SizeofResource error`nReturn value = " szData "`nLast error = " A_LastError
+        
+        If ( !hData := DllCall( "LoadResource", Ptr,hLib, Ptr,hRes ) )
+            Return 0, ErrorLevel := "LoadResource error`nReturn value = " hData "`nLast error = " A_LastError
+        
+        If ( !pData := DllCall( "LockResource", Ptr,hData ) )
+            Return 0, ErrorLevel := "LockResource error`nReturn value = " pData "`nLast error = " A_LastError
+    }
+    Finally
+    {
+        ; If we loaded the DLL, free it now.
+        If ( bLoaded )
+            DllCall( "FreeLibrary", Ptr,hLib )
+    }
     
     Return pData
 }
@@ -65,13 +71,13 @@ UpdRes_LockResource(sBinFile, sResName, nResType, ByRef szData)
 UpdRes_UpdateResource(sBinFile, bDelOld, sResName, nResType, nLangId, pData, szData)
 {
     If ( !hMod := DllCall( "BeginUpdateResource", Str,sBinFile, Int,bDelOld ) )
-        Return 0, A_LastError := "BeginUpdateResource error.`nReturn value >>`t" hMod " - Last error >>`t" A_LastError
+        Return 0, ErrorLevel := "BeginUpdateResource error`nReturn value = " hMod "`nLast error = " A_LastError
         
     If ( !e := DllCall( "UpdateResource", Ptr,hMod, Ptr,nResType, Str,sResName, UInt,nLangId, Ptr,pData, UInt,szData ) )
-        Return 0, A_LastError := "UpdateResource error.`nReturn value >>`t" e " - Last error >>`t" A_LastError
+        Return 0, ErrorLevel := "UpdateResource error`nReturn value = " e "`nLast error = " A_LastError
     
     If ( !e := DllCall( "EndUpdateResource", Ptr,hMod, Int,0 ) )
-        Return 0, A_LastError := "EndUpdateResource error.`nReturn value >>`t" e " - Last error >>`t" A_LastError
+        Return 0, ErrorLevel := "EndUpdateResource error`nReturn value = " e "`nLast error = " A_LastError
     
     Return 1
 }
@@ -92,10 +98,10 @@ UpdRes_UpdateResource(sBinFile, bDelOld, sResName, nResType, nLangId, pData, szD
 UpdRes_UpdateArrayOfResources(sBinFile, bDelOld, ByRef objRes)
 {
     If ( !IsObject(objRes) )
-        Return 0, A_LastError := "Array of resources object is not an object."
+        Return 0, ErrorLevel := "Array of resources object is not an object."
         
     If ( !hMod := DllCall( "BeginUpdateResource", Str,sBinFile, Int,bDelOld ) )
-        Return 0, A_LastError := "BeginUpdateResource error.`nReturn value >>`t" hMod " - Last error >>`t" A_LastError
+        Return 0, ErrorLevel := "BeginUpdateResource error`nReturn value = " hMod "`nLast error = " A_LastError
     
     Loop % objRes.MaxIndex()
     {
@@ -107,7 +113,7 @@ UpdRes_UpdateArrayOfResources(sBinFile, bDelOld, ByRef objRes)
     }
     
     If ( !e := DllCall( "EndUpdateResource", Ptr,hMod, Int,0 ) )
-        Return 0, A_LastError := "EndUpdateResource error.`nReturn value >>`t" e " - Last error >>`t" A_LastError
+        Return 0, ErrorLevel := "EndUpdateResource error`nReturn value = " e "`nLast error = " A_LastError
     
     Return nUpdated
 }
@@ -127,9 +133,9 @@ UpdRes_UpdateArrayOfResources(sBinFile, bDelOld, ByRef objRes)
 UpdRes_UpdateDirOfResources(sResDir, sBinFile, bDelOld, nResType, nLangId)
 {    
     If ( !FileExist(sBinFile) || !InStr(FileExist(sResDir), "D") )
-        Return 0, A_LastError := "Binary file or resources directory not existing."
+        Return 0, ErrorLevel := "Binary file or resources directory not existing."
     
-    try
+    Try
     {
         objRes := Object()
         Loop, %sResDir%\*.*
@@ -158,7 +164,7 @@ UpdRes_UpdateDirOfResources(sResDir, sBinFile, bDelOld, nResType, nLangId)
         }
         nUpdated := UpdRes_UpdateArrayOfResources(sBinFile, bDelOld, objRes)
     }
-    finally
+    Finally
     {
         Loop % objRes.MaxIndex()
             DllCall( "UnmapViewOfFile", Ptr,objRes[A_Index].__pMap )
@@ -173,9 +179,10 @@ UpdRes_UpdateDirOfResources(sResDir, sBinFile, bDelOld, nResType, nLangId)
 ; ----------------------------------------------------------------------------------------------------------------------
 ; Function .....: UpdRes_EnumerateResources
 ; Description ..: Enumerate all the resources of a specific type inside a binary file.
-; Parameters ...: sBinFile - PE file whose resources are to be enumerated.
+; Parameters ...: sBinFile - PE file whose resources are to be enumerated. If = 0 the current process resources will be 
+; ..............:            enumerated.
 ; ..............: nResType - The resource type.
-; Return .......: List of enumerated resources.
+; Return .......: List of enumerated resources, 0 on error.
 ; Info .........: EnumResourceNames: https://msdn.microsoft.com/en-us/library/windows/desktop/ms648037(v=vs.85).aspx
 ; ----------------------------------------------------------------------------------------------------------------------
 UpdRes_EnumerateResources(sBinFile, nResType)
@@ -184,18 +191,23 @@ UpdRes_EnumerateResources(sBinFile, nResType)
     {
         ; If the DLL isn't already loaded, load it as a data file.
         If ( !hLib := DllCall( "LoadLibraryEx", Str,sBinFile, Ptr,0, UInt,0x2 ) )
-            Return "LoadLibraryEx error.`nReturn value >>`t" hLib "`nLast error >>`t" A_LastError
+            Return 0, ErrorLevel := "LoadLibraryEx error`nReturn value = " hLib "`nLast error = " A_LastError
         bLoaded := 1
     }
     
-    ; Enumerate the resources of type nResType.
-    cbEnum := RegisterCallback( "__UpdRes_EnumeratorCallback" ), adrEnumList := 0
-    DllCall( "EnumResourceNames", Ptr,hLib, Ptr,nResType, Ptr,cbEnum, Ptr,&adrEnumList )
-    DllCall( "GlobalFree", Ptr,cbEnum )
-    
-    ; If we loaded the DLL, free it now.
-    If ( bLoaded )
-        DllCall( "FreeLibrary", Ptr,hLib )
+    Try
+    {
+        ; Enumerate the resources of type nResType.
+        cbEnum := RegisterCallback( "__UpdRes_EnumeratorCallback" ), adrEnumList := 0
+        DllCall( "EnumResourceNames", Ptr,hLib, Ptr,nResType, Ptr,cbEnum, Ptr,&adrEnumList )
+        DllCall( "GlobalFree", Ptr,cbEnum )
+    }
+    Finally
+    {
+        ; If we loaded the DLL, free it now.
+        If ( bLoaded )
+            DllCall( "FreeLibrary", Ptr,hLib )
+    }
     
     ; Recover the address of the enumeration string and get it.
     Return StrGet(NumGet(&adrEnumList))
