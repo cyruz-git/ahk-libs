@@ -13,8 +13,8 @@
 ; ----------------------------------------------------------------------------------------------------------------------
 ; Function .....: TrayIcon_GetInfo
 ; Description ..: Get a series of useful information about tray icons.
-; Parameters ...: sExeName  - The exe for which we are searching the tray icon data. Leave it empty to receive data for 
-; ..............:             all tray icons.
+; Parameters ...: sExeName  - The exe or the PID for which we are searching the tray icon data. Leave it empty to 
+; ..............:             receive data for all tray icons.
 ; Return .......: oTrayInfo - An array of objects containing tray icons data. Any entry is structured like this:
 ; ..............:             oTrayInfo[A_Index].idx     - 0 based tray icon index.
 ; ..............:             oTrayInfo[A_Index].idcmd   - Command identifier associated with the button.
@@ -84,7 +84,7 @@ TrayIcon_GetInfo(sExeName:="")
         DllCall( "CloseHandle",   Ptr,hProc                               )
 	}
 	DetectHiddenWindows, %d%
-	Return oTrayInfo
+	Return ( oTrayInfo.MaxIndex() > 0 ) ? oTrayInfo : 0
 }
 
 ; ----------------------------------------------------------------------------------------------------------------------
@@ -153,6 +153,40 @@ TrayIcon_Move(idxOld, idxNew, sTrayPlace:="Shell_TrayWnd")
 }
 
 ; ----------------------------------------------------------------------------------------------------------------------
+; Function .....: TrayIcon_Set
+; Description ..: Modify icon with the given index for the given window.
+; Parameters ...: hWnd       - Window handle.
+; ..............: uId        - Application defined identifier for the icon.
+; ..............: hIcon      - Handle to the tray icon.
+; ..............: hIconSmall - Handle to the small icon, for window menubar. Optional.
+; ..............: hIconBig   - Handle to the big icon, for taskbar. Optional.
+; Return .......: True on success, false on failure.
+; Info .........: NOTIFYICONDATA structure  - https://goo.gl/1Xuw5r
+; ..............: Shell_NotifyIcon function - https://goo.gl/tTSSBM
+; ----------------------------------------------------------------------------------------------------------------------
+TrayIcon_Set(hWnd, uId, hIcon, hIconSmall:=0, hIconBig:=0)
+{
+    d := A_DetectHiddenWindows
+    DetectHiddenWindows, On
+    ; WM_SETICON = 0x80
+    If ( hIconSmall ) 
+        SendMessage, 0x80, 0, hIconSmall,, ahk_id %hWnd%
+    If ( hIconBig )
+        SendMessage, 0x80, 1, hIconBig,, ahk_id %hWnd%
+    DetectHiddenWindows, %d%
+
+    sz := VarSetCapacity( NID, (A_PtrSize == 4) ? (A_IsUnicode ? 828 : 444) : 848, 0 )
+    NumPut( sz,    NID, 0                           )
+    NumPut( hWnd,  NID, (A_PtrSize == 4) ? 4   : 8  )
+    NumPut( uId,   NID, (A_PtrSize == 4) ? 8   : 16 )
+    NumPut( 2,     NID, (A_PtrSize == 4) ? 12  : 20 )
+    NumPut( hIcon, NID, (A_PtrSize == 4) ? 20  : 32 )
+    
+    ; NIM_MODIFY := 0x1
+    Return DllCall( "Shell32.dll\Shell_NotifyIcon", UInt,0x1, Ptr,&NID )
+}
+
+; ----------------------------------------------------------------------------------------------------------------------
 ; Function .....: TrayIcon_GetTrayBar
 ; Description ..: Get the tray icon handle.
 ; Return .......: Tray icon handle.
@@ -190,38 +224,4 @@ TrayIcon_GetHotItem()
    idxTB := TrayIcon_GetTrayBar()
    SendMessage, 0x447, 0, 0, ToolbarWindow32%idxTB%, ahk_class Shell_TrayWnd ; TB_GETHOTITEM = 0x447
    Return ErrorLevel << 32 >> 32
-}
-
-; ----------------------------------------------------------------------------------------------------------------------
-; Function .....: TrayIcon_SetIcon
-; Description ..: Modify icon with the given index for the given window.
-; Parameters ...: hWnd       - Window handle.
-; ..............: uId        - Application defined identifier for the icon.
-; ..............: hIcon      - Handle to the tray icon.
-; ..............: hIconSmall - Handle to the small icon, for window menubar. Optional.
-; ..............: hIconBig   - Handle to the big icon, for taskbar. Optional.
-; Return .......: True on success, false on failure.
-; Info .........: NOTIFYICONDATA structure  - https://goo.gl/1Xuw5r
-; ..............: Shell_NotifyIcon function - https://goo.gl/tTSSBM
-; ----------------------------------------------------------------------------------------------------------------------
-TrayIcon_SetIcon(hWnd, uId, hIcon, hIconSmall:=0, hIconBig:=0)
-{
-    d := A_DetectHiddenWindows
-    DetectHiddenWindows, On
-    ; WM_SETICON = 0x80
-    If ( hIconSmall ) 
-        SendMessage, 0x80, 0, hIconSmall,, ahk_id %hWnd%
-    If ( hIconBig )
-        SendMessage, 0x80, 1, hIconBig,, ahk_id %hWnd%
-    DetectHiddenWindows, %d%
-
-    sz := VarSetCapacity( NID, (A_PtrSize == 4) ? (A_IsUnicode ? 828 : 444) : 848, 0 )
-    NumPut( sz,    NID, 0                           )
-    NumPut( hWnd,  NID, (A_PtrSize == 4) ? 4   : 8  )
-    NumPut( uId,   NID, (A_PtrSize == 4) ? 8   : 16 )
-    NumPut( 2,     NID, (A_PtrSize == 4) ? 12  : 20 )
-    NumPut( hIcon, NID, (A_PtrSize == 4) ? 20  : 32 )
-    
-    ; NIM_MODIFY := 0x1
-    Return DllCall( "Shell32.dll\Shell_NotifyIcon", UInt,0x1, Ptr,&NID )
 }
