@@ -11,7 +11,7 @@
 
 ; ----------------------------------------------------------------------------------------------------------------------
 ; Function .....: WinEvents_RegisterForEvents
-; Description ..: Registers the application to send Windows log events.
+; Description ..: Register the application to send Windows log events.
 ; Parameters ...: sLogName - Can be "Application", "System" or a custom event log name.
 ; Return .......: Handle to the registered source on success, NULL on failure.
 ; ----------------------------------------------------------------------------------------------------------------------
@@ -21,7 +21,7 @@ WinEvents_RegisterForEvents(sLogName) {
 
 ; ----------------------------------------------------------------------------------------------------------------------
 ; Function .....: WinEvents_DeregisterForEvents
-; Description ..: Deregisters the previously registered application.
+; Description ..: Deregister the previously registered application.
 ; Parameters ...: hSource    - Handle to a previously registered events source with RegisterForEvents.
 ; Return .......: Nonzero if the function succeeds or zero if it fails.
 ; ----------------------------------------------------------------------------------------------------------------------
@@ -31,7 +31,7 @@ WinEvents_DeregisterForEvents(hSource) {
 
 ; ----------------------------------------------------------------------------------------------------------------------
 ; Function .....: WinEvents_SendWinLogEvent
-; Description ..: Writes an entry at the end of the specified Windows event log.
+; Description ..: Write an entry at the end of the specified Windows event log.
 ; Parameters ...: hSource    - Handle to a previously registered events source with RegisterForEvents.
 ; ..............: evType     - Can be: "EVENTLOG_SUCCESS"
 ; ..............:                      "EVENTLOG_AUDIT_FAILURE"

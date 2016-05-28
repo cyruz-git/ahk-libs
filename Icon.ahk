@@ -39,7 +39,7 @@ Icon_Create(adrBuf, nIconWidth, szBuf:=0)
 
 ; ----------------------------------------------------------------------------------------------------------------------
 ; Name .........: Icon_Load function
-; Description ..: It loads an icon from a PE file as a resource or from an icon file.
+; Description ..: Load an icon from a PE file as a resource or from an icon file.
 ; Parameters ...: sBinFile - Can be:
 ; ..............:            *  0 to load a resource from the current process executable.
 ; ..............:            *  The module name or the full path to its executable/dll to load a resource from it.
@@ -82,8 +82,8 @@ Icon_Load(sBinFile, sResName, nWidth)
 }
 
 ; ----------------------------------------------------------------------------------------------------------------------
-; Name .........: Icon_Load function
-; Description ..: It loads an icon from a PE file as a resource or from an icon file.
+; Name .........: Icon_Destroy function
+; Description ..: Destroy an icon handle.
 ; Parameters ...: hIcon - Handle to the icon to be destroyed.
 ; Info .........: DestroyIcon function - https://goo.gl/LaivE8
 ; ----------------------------------------------------------------------------------------------------------------------

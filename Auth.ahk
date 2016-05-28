@@ -66,7 +66,7 @@ Auth_RunAsUser(sCmdLine)
         ; SID_AND_ATTRIBUTES - http://msdn.microsoft.com/en-us/library/aa379595
         VarSetCapacity( SIDATTR, (A_PtrSize == 4) ? 8 : 16, 0 )
         NumPut( &pSid, &SIDATTR, 0, "Ptr"                     )
-        ; missing SE_GROUP_USE_FOR_DENY_ONLY
+        ; Missing SE_GROUP_USE_FOR_DENY_ONLY
     }
 
     ; Restrict the token (deny the Administrators SID on XP).
